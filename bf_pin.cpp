@@ -41,7 +41,7 @@ void bft(int nt, vector<ParamThread>& pt, string md5)
     string md5digest;
 
     bool f_find = false;
-    while (pt[nt].current < pt[nt].max && !f_find)
+    while (pt[nt].current <= pt[nt].max && !f_find)
     {
         temp_pin = to_string(pt[nt].current);
         while (temp_pin.length() < NUMPIN)
@@ -52,10 +52,10 @@ void bft(int nt, vector<ParamThread>& pt, string md5)
             pt[nt].status = 2;
             pt[nt].result = "Pin: " + temp_pin + "   :)";
         }
-           
+
         for (size_t i = 0; i < pt.size(); i++)
             if (pt[i].status == 2) f_find = true;
-
+            
         pt[nt].current++;
     }
 
@@ -111,6 +111,9 @@ int main(int argc, char* argv[])
         if (i == pt.size() - 1) pt[i].max = (int)pow(10, NUMPIN)-1;
         else pt[i].max = part * (i + 1);
 
+        //pt[0].current = 99999997;
+        //pt[0].max = 99999999;
+
         //bft(i, pt, md5);
         th.push_back(thread(bft, i, ref(pt), md5));
     };
@@ -118,11 +121,13 @@ int main(int argc, char* argv[])
     bool f_find = true;
     while (f_find)
     {
+        this_thread::sleep_for(chrono::seconds(5));
         system("cls");
         cout << "Working..." << "\n\n";
         for (size_t i = 0; i < pt.size(); i++)
         {
-            int percent = 100 - ((pt[i].max - pt[i].current) / (part / 100));
+            //int percent = 100 - int(((pt[i].max - pt[i].current) / (part / 100)));
+            int percent = (part - (pt[i].max-pt[i].current))*100 / part;
             string tpin = to_string(pt[i].current);
             while (tpin.length() < NUMPIN) tpin = "0" + tpin;
             
@@ -137,7 +142,7 @@ int main(int argc, char* argv[])
             if (pt[i].status == 2) f_find = false;
         }
         cout << "\n";
-        this_thread::sleep_for(chrono::seconds(5));
+       
     }
 
     for (size_t i = 0; i < th.size(); i++)
@@ -153,6 +158,7 @@ int main(int argc, char* argv[])
     //d1ca3aaf52b41acd68ebb3bf69079bd1 - 10000000  130 sec. 1 t
     //5eceadafba9f7df05d245049d9d2de4e - 20000000  6 sec. 1 t
     //ef775988943825d2871e1cfa75473ec0 - 99999999
+    
     system("pause");
     return 0;
 }
