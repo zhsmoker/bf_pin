@@ -5,7 +5,7 @@
 #include <chrono>
 #include <thread>
 #include <cstdio>
-//#include <openssl/md5.h>
+#include <openssl/md5.h>
 #include <openssl/evp.h>
 
 using namespace std;
@@ -35,6 +35,26 @@ string calculate_md5(const string& content) {
     return output;
 }
 
+string calculate2_md5(const string& content) {
+/*
+    unsigned char* MD5(const unsigned char* d, size_t n,
+        unsigned char* md);
+*/
+    unsigned char temp_pin[NUMPIN+1];
+    unsigned char md5digest[MD5_DIGEST_LENGTH];
+    //MD5(reinterpret_cast<const unsigned char*>(content.c_str()), NUMPIN, md5digest);
+
+    copy(content.begin(), content.end(), temp_pin);
+#pragma warning(suppress : 4996)
+    MD5(temp_pin, NUMPIN, md5digest);
+
+    string output;
+    output.resize(MD5_DIGEST_LENGTH*2);
+    for (size_t i = 0; i < MD5_DIGEST_LENGTH; ++i) sprintf_s(&output[i * 2], MD5_DIGEST_LENGTH, "%02x", md5digest[i]);
+    return output;
+}
+
+
 void bft(int nt, vector<ParamThread>& pt, string md5)
 {
     string temp_pin;
@@ -47,7 +67,7 @@ void bft(int nt, vector<ParamThread>& pt, string md5)
         while (temp_pin.length() < NUMPIN)
             temp_pin = "0" + temp_pin;
 
-        if (calculate_md5(temp_pin) == md5)
+        if (calculate2_md5(temp_pin) == md5)
         {
             pt[nt].status = 2;
             pt[nt].result = "Pin: " + temp_pin + "   :)";
@@ -99,6 +119,7 @@ int main(int argc, char* argv[])
     cout << "\nWorking..." << "\n\n";
 
     int count_thread = thread::hardware_concurrency();
+    
     vector<ParamThread> pt(count_thread);
     vector<thread> th;
     int part = (int)pow(10, NUMPIN) / count_thread;
@@ -111,8 +132,8 @@ int main(int argc, char* argv[])
         if (i == pt.size() - 1) pt[i].max = (int)pow(10, NUMPIN)-1;
         else pt[i].max = part * (i + 1);
 
-        //pt[0].current = 99999997;
-        //pt[0].max = 99999999;
+        //pt[0].current = 10000000;
+        //pt[0].max = 10000000;
 
         //bft(i, pt, md5);
         th.push_back(thread(bft, i, ref(pt), md5));
@@ -124,6 +145,7 @@ int main(int argc, char* argv[])
         this_thread::sleep_for(chrono::seconds(5));
         system("cls");
         cout << "Working..." << "\n\n";
+        f_find = false;
         for (size_t i = 0; i < pt.size(); i++)
         {
             //int percent = 100 - int(((pt[i].max - pt[i].current) / (part / 100)));
@@ -139,7 +161,7 @@ int main(int argc, char* argv[])
             //cout << "]";
             cout << " " << percent << " %\n";
             
-            if (pt[i].status == 2) f_find = false;
+            if (pt[i].status == 0) f_find = true;
         }
         cout << "\n";
        
@@ -151,12 +173,12 @@ int main(int argc, char* argv[])
     cout << "Work time:  " << (clock() - begin_time)/CLOCKS_PER_SEC << " sec.\n";
     
     //6e43eb106cc2fef12235527e05abc129 - 00150000
-    //7e7de0bed2f111ca36f9756864a86b5c - 00500000  6 sec. 1 t
+    //7e7de0bed2f111ca36f9756864a86b5c - 00500000
     //c981605d1a34f91b9ecc8a23ffd14f84 - 01500000 
-    //c981605d1a34f91b9ecc8a23ffd14f84 - 26500000 1
+    //c981605d1a34f91b9ecc8a23ffd14f84 - 26500000
     //3dc3bd78a53c4949d08f5c73a49c371e - 30500000
-    //d1ca3aaf52b41acd68ebb3bf69079bd1 - 10000000  130 sec. 1 t
-    //5eceadafba9f7df05d245049d9d2de4e - 20000000  6 sec. 1 t
+    //d1ca3aaf52b41acd68ebb3bf69079bd1 - 10000000 ver 1 - 50 sec. ver 2 - 39 sec.
+    //5eceadafba9f7df05d245049d9d2de4e - 20000000
     //ef775988943825d2871e1cfa75473ec0 - 99999999
     
     system("pause");
