@@ -4,86 +4,56 @@
 #include <regex>
 #include <chrono>
 #include <thread>
-#include <cstdio>
 #include <openssl/md5.h>
-#include <openssl/evp.h>
 
 using namespace std;
 
 #define NUMPIN 8
 
-struct ParamThread
+void bft(int& result, int current, int end, const unsigned char* md5)
 {
-    size_t current = 0;
-    size_t max = 0;
-    short status = 0;/// 0 - work, 1 - not find, 2 - find 
-    string result = "Work";
-};
-
-string calculate_md5(const string& content) {
-    EVP_MD_CTX* context = EVP_MD_CTX_new();
-    const EVP_MD* md = EVP_md5();
-    unsigned char md_value[EVP_MAX_MD_SIZE];
-    unsigned int md_len;
-    string output;
-    EVP_DigestInit_ex2(context, md, NULL);
-    EVP_DigestUpdate(context, content.c_str(), content.length());
-    EVP_DigestFinal_ex(context, md_value, &md_len);
-    EVP_MD_CTX_free(context);
-    output.resize(md_len*2);
-    for (size_t i = 0; i < md_len; ++i) sprintf_s(&output[i*2], md_len, "%02x", md_value[i]);
-    return output;
-}
-
-string calculate2_md5(const string& content) {
-/*
-    unsigned char* MD5(const unsigned char* d, size_t n,
-        unsigned char* md);
-*/
-    unsigned char temp_pin[NUMPIN+1];
+    unsigned char t_pin[NUMPIN];
     unsigned char md5digest[MD5_DIGEST_LENGTH];
-    //MD5(reinterpret_cast<const unsigned char*>(content.c_str()), NUMPIN, md5digest);
+    
+    int num = current;
+    int i;
 
-    copy(content.begin(), content.end(), temp_pin);
-#pragma warning(suppress : 4996)
-    MD5(temp_pin, NUMPIN, md5digest);
-
-    string output;
-    output.resize(MD5_DIGEST_LENGTH*2);
-    for (size_t i = 0; i < MD5_DIGEST_LENGTH; ++i) sprintf_s(&output[i * 2], MD5_DIGEST_LENGTH, "%02x", md5digest[i]);
-    return output;
-}
-
-
-void bft(int nt, vector<ParamThread>& pt, string md5)
-{
-    string temp_pin;
-    string md5digest;
+    for (i = NUMPIN; i > 0; i--, num /= 10)
+        t_pin[i - 1] = (num % 10) + '0';
 
     bool f_find = false;
-    while (pt[nt].current <= pt[nt].max && !f_find)
-    {
-        temp_pin = to_string(pt[nt].current);
-        while (temp_pin.length() < NUMPIN)
-            temp_pin = "0" + temp_pin;
 
-        if (calculate2_md5(temp_pin) == md5)
-        {
-            pt[nt].status = 2;
-            pt[nt].result = "Pin: " + temp_pin + "   :)";
+    while (current <= end && result>99999999)
+    {
+        
+#pragma warning(suppress : 4996)
+        MD5(t_pin, NUMPIN, md5digest);
+
+        f_find = true;
+        for (i = 0; i < MD5_DIGEST_LENGTH && f_find; i++) {
+            if (md5digest[i] != md5[i])
+                f_find = false;
         }
 
-        for (size_t i = 0; i < pt.size(); i++)
-            if (pt[i].status == 2) f_find = true;
-            
-        pt[nt].current++;
+        if (f_find)
+        {
+            result = current;
+            return;
+        }
+
+        for (i = NUMPIN; i > 0; i--) {
+            if (t_pin[i - 1] == '9')
+                t_pin[i - 1] = '0';
+            else {
+                t_pin[i - 1]++;
+                break;
+            }
+        }
+
+        current++;
     }
 
-    if (!f_find || (f_find && pt[nt].status != 2))
-    {
-        pt[nt].status = 1;
-        pt[nt].result = "Pin: not found   :( ";
-    }
+    return;
 }
 
 int main(int argc, char* argv[])
@@ -92,86 +62,85 @@ int main(int argc, char* argv[])
         
     string md5;
     string temp_str;
-    string temp_pin = "00000000";
+    unsigned char tempmd5[MD5_DIGEST_LENGTH];
 
     if (argc > 1) {
         temp_str = argv[1];
     }
     else {
-        cout << "Enter the md5 hash: (example - 65522f4e85d0be0399d821ddcda26d01)" << "\n";
+        cout << "Example: md5 hash = pin" << "\n";
+        cout << "d1ca3aaf52b41acd68ebb3bf69079bd1 = pin 10000000" << "\n";
+        cout << "ef775988943825d2871e1cfa75473ec0 = pin 99999999" << "\n";
+        cout << "Enter the md5 hash: ";
         cin >> temp_str;
     }
      
     for (size_t i = 0; i < strlen(temp_str.data()); i++)
         md5+=tolower(temp_str[i]);
 
-    //cout << md5 << "\n";
-
     if (regex_match(md5.data(), r)) {
-        cout << "Check md5 !";
+        cout << "Check md5 !" << "\n";
     }
     else {
         cout << "\nThe entered value is not an md5 hash !" << "\n\n";
         system("pause");
         return 0;
     }
-
-    cout << "\nWorking..." << "\n\n";
-
-    int count_thread = thread::hardware_concurrency();
-    
-    vector<ParamThread> pt(count_thread);
-    vector<thread> th;
-    int part = (int)pow(10, NUMPIN) / count_thread;
     
     clock_t begin_time = clock();
-    for (size_t i = 0; i < pt.size(); i++)
+
+    int i1, i2, b1, b2;
+    for (size_t i = 0; i < MD5_DIGEST_LENGTH; i++)
     {
-        pt[i].current = part * i;
-
-        if (i == pt.size() - 1) pt[i].max = (int)pow(10, NUMPIN)-1;
-        else pt[i].max = part * (i + 1);
-
-        //pt[0].current = 10000000;
-        //pt[0].max = 10000000;
-
-        //bft(i, pt, md5);
-        th.push_back(thread(bft, i, ref(pt), md5));
-    };
-
-    bool f_find = true;
-    while (f_find)
-    {
-        this_thread::sleep_for(chrono::seconds(5));
-        system("cls");
-        cout << "Working..." << "\n\n";
-        f_find = false;
-        for (size_t i = 0; i < pt.size(); i++)
-        {
-            //int percent = 100 - int(((pt[i].max - pt[i].current) / (part / 100)));
-            int percent = (part - (pt[i].max-pt[i].current))*100 / part;
-            string tpin = to_string(pt[i].current);
-            while (tpin.length() < NUMPIN) tpin = "0" + tpin;
-            
-            cout << "Thread[" << i << "] ";
-            cout << tpin << " - " << pt[i].max << /*"\t" << pt[i].status <<*/ "\t" << pt[i].result;
-            //cout << " [";
-            //for (size_t i = 0; i < percent / 5; i++) cout << "=";
-            //for (size_t i = 0; i < 100-percent / 5; i++) cout << " ";
-            //cout << "]";
-            cout << " " << percent << " %\n";
-            
-            if (pt[i].status == 0) f_find = true;
-        }
-        cout << "\n";
-       
+        i1 = int(md5[i*2]);
+        i2 = int(md5[i*2 + 1]);
+        b1 = (i1 >= 0x30 && i1 <= 0x39) ? i1 - 0x30 : i1 - 0x57;
+        b2 = (i2 >= 0x30 && i2 <= 0x39) ? i2 - 0x30 : i2 - 0x57;
+        tempmd5[i] = (b1 << 4) | b2;
     }
 
-    for (size_t i = 0; i < th.size(); i++)
+    int result = (int)pow(10, NUMPIN) + 77;
+    int count_thread = thread::hardware_concurrency();
+    
+    cout << "Working (thread count - " << count_thread << " ) ..." << "\n";
+    
+    int part = (int)pow(10, NUMPIN) / count_thread;
+
+    vector<thread> th;
+    int current, max;
+    for (int i = 0; i < count_thread; i++)
+    {
+        current = part * i;
+
+        if (i == count_thread - 1) max = (int)pow(10, NUMPIN)-1;
+        else max = part * (i + 1);
+
+        th.push_back(thread(bft, ref(result), current, max, tempmd5));
+    };
+
+    for (int i = 0; i < th.size(); i++)
         th[i].join();
 
-    cout << "Work time:  " << (clock() - begin_time)/CLOCKS_PER_SEC << " sec.\n";
+    string p = to_string(result);
+
+    if (result < 100000000)
+    {
+        while (p.length() < NUMPIN)
+            p = "0" + p;
+        cout << "Find pin: " << p << endl;
+    }
+    else 
+        cout << "Pin not found" << endl;
+
+
+    //this_thread::sleep_for(chrono::seconds(5));
+    clock_t end_time = clock();
+
+    double time_spent = (double)(end_time - begin_time) / CLOCKS_PER_SEC;
+    printf("Work time is %f seconds.\n", time_spent);
+
     
+    //dd4b21e9ef71e1291183a46b913ae6f2 - 00000000
     //6e43eb106cc2fef12235527e05abc129 - 00150000
     //7e7de0bed2f111ca36f9756864a86b5c - 00500000
     //c981605d1a34f91b9ecc8a23ffd14f84 - 01500000 
